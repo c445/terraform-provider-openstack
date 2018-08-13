@@ -235,7 +235,7 @@ func testAccCheckNetworkingV2NetworkExists(n string, network *networks.Network) 
 }
 
 const testAccNetworkingV2Network_basic = `
-resource "openstack_networking_network_v2" "network_1" {
+resource "openstack_networking_network_v2" "net_kubernetes" {
   name = "network_1"
   admin_state_up = "true"
 }

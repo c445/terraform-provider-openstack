@@ -17,6 +17,27 @@ func resourceListenerV2() *schema.Resource {
 		Read:   resourceListenerV2Read,
 		Update: resourceListenerV2Update,
 		Delete: resourceListenerV2Delete,
+		Importer: &schema.ResourceImporter{
+			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+
+				config := meta.(*Config)
+				lbClient, err := chooseLBV2Client(d, config)
+				if err != nil {
+					return nil, fmt.Errorf("Error creating OpenStack networking client: %s", err)
+				}
+
+				listener, err := listeners.Get(lbClient, d.Id()).Extract()
+				if err != nil {
+					return nil, CheckDeleted(d, err, "listener")
+				}
+
+				log.Printf("[DEBUG] Retrieved listener %s: %#v", d.Id(), listener)
+
+				d.Set("loadbalancer_id", listener.Loadbalancers[0].ID)
+
+				return []*schema.ResourceData{d}, nil
+			},
+		},
 
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),

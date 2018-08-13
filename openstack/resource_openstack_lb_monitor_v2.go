@@ -17,6 +17,27 @@ func resourceMonitorV2() *schema.Resource {
 		Read:   resourceMonitorV2Read,
 		Update: resourceMonitorV2Update,
 		Delete: resourceMonitorV2Delete,
+		Importer: &schema.ResourceImporter{
+			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+
+				config := meta.(*Config)
+				lbClient, err := chooseLBV2Client(d, config)
+				if err != nil {
+					return nil, fmt.Errorf("Error creating OpenStack networking client: %s", err)
+				}
+
+				monitor, err := monitors.Get(lbClient, d.Id()).Extract()
+				if err != nil {
+					return nil, CheckDeleted(d, err, "monitor")
+				}
+
+				log.Printf("[DEBUG] Retrieved monitor %s: %#v", d.Id(), monitor)
+
+				d.Set("pool_id", monitor.Pools[0].ID)
+
+				return []*schema.ResourceData{d}, nil
+			},
+		},
 
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),

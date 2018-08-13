@@ -153,6 +153,8 @@ func resourceNetworkFloatingIPV2Read(d *schema.ResourceData, meta interface{}) e
 
 	d.Set("region", GetRegion(d, config))
 
+	d.Set("value_specs", map[string]string{"floating_ip_address": floatingIP.FloatingIP})
+
 	return nil
 }
 

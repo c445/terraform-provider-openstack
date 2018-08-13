@@ -19,7 +19,31 @@ func resourceNetworkingRouterV2() *schema.Resource {
 		Update: resourceNetworkingRouterV2Update,
 		Delete: resourceNetworkingRouterV2Delete,
 		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
+			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+				config := meta.(*Config)
+				networkingClient, err := config.networkingV2Client(GetRegion(d, config))
+				if err != nil {
+					return nil, fmt.Errorf("Error creating OpenStack networking client: %s", err)
+				}
+
+				type router struct {
+					routers.Router
+					RouterType string `json:"router_type"`
+				}
+				var n struct {
+					Router *router `json:"router"`
+				}
+				err = routers.Get(networkingClient, d.Id()).ExtractInto(&n)
+				if err != nil {
+					return nil, fmt.Errorf("Error retrieving OpenStack Neutron Router: %s", err)
+				}
+
+				log.Printf("[DEBUG] Retrieved Router %s: %+v", d.Id(), n.Router)
+
+				d.Set("value_specs", map[string]string{"router_type": n.Router.RouterType})
+
+				return []*schema.ResourceData{d}, nil
+			},
 		},
 
 		Timeouts: &schema.ResourceTimeout{

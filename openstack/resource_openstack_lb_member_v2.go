@@ -17,6 +17,50 @@ func resourceMemberV2() *schema.Resource {
 		Read:   resourceMemberV2Read,
 		Update: resourceMemberV2Update,
 		Delete: resourceMemberV2Delete,
+		Importer: &schema.ResourceImporter{
+			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+				config := meta.(*Config)
+				lbClient, err := chooseLBV2Client(d, config)
+				if err != nil {
+					return nil, fmt.Errorf("Error creating OpenStack networking client: %s", err)
+				}
+
+				listOpts := pools.ListOpts{}
+				pageinator := pools.List(lbClient, listOpts)
+
+				pages, err := pageinator.AllPages()
+				if err != nil {
+					return nil, err
+				}
+				lbPools, err := pools.ExtractPools(pages)
+
+				var lbPool pools.Pool
+				for _, l := range lbPools {
+					for _, m := range l.Members {
+						if m.ID == d.Id() {
+							lbPool = l
+							break
+						}
+					}
+				}
+
+				if lbPool.ID == "" {
+					panic(fmt.Errorf("lb_member not found in existing pools"))
+				}
+				d.Set("pool_id", lbPool.ID)
+
+				//member, err := pools.GetMember(lbClient, d.Get("pool_id").(string), d.Id()).Extract()
+				//if err != nil {
+				//	panic(fmt.Errorf("error retrieve lb_member %v", err))
+				//}
+				//
+				//log.Printf("[DEBUG] Retrieved member %s: %#v", d.Id(), member)
+				//
+				//d.Set("address", member.Address)
+
+				return []*schema.ResourceData{d}, nil
+			},
+		},
 
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
