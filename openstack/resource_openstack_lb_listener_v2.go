@@ -172,6 +172,7 @@ func resourceListenerV2Create(d *schema.ResourceData, meta interface{}) error {
 					return resource.RetryableError(err)
 				}
 				if len(listenersList) == 1 {
+					listener = &listenersList[0]
 					return nil
 				}
 				return resource.RetryableError(err)

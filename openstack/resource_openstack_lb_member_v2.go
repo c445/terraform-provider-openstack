@@ -148,11 +148,12 @@ func resourceMemberV2Create(d *schema.ResourceData, meta interface{}) error {
 				if err != nil {
 					return resource.RetryableError(err)
 				}
-				memberList, err := pools.ExtractPools(pages)
+				memberList, err := pools.ExtractMembers(pages)
 				if err != nil {
 					return resource.RetryableError(err)
 				}
 				if len(memberList) == 1 {
+					member = &memberList[0]
 					return nil
 				}
 				return resource.RetryableError(err)
