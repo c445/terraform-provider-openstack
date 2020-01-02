@@ -2,6 +2,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/gophercloud/gophercloud"
 	"log"
 	"strings"
 	"time"
@@ -138,6 +139,25 @@ func resourceMemberV2Create(d *schema.ResourceData, meta interface{}) error {
 	err = resource.Retry(timeout, func() *resource.RetryError {
 		member, err = pools.CreateMember(lbClient, poolID, createOpts).Extract()
 		if err != nil {
+			err409, ok := err.(gophercloud.ErrDefault409)
+			if ok && strings.Contains(string(err409.Body), "MemberExists") {
+				pages, err := pools.ListMembers(lbClient, poolID, pools.ListMembersOpts{
+					Address:      d.Get("address").(string),
+					ProtocolPort: d.Get("protocol_port").(int),
+				}).AllPages()
+				if err != nil {
+					return resource.RetryableError(err)
+				}
+				memberList, err := pools.ExtractMembers(pages)
+				if err != nil {
+					return resource.RetryableError(err)
+				}
+				if len(memberList) == 1 {
+					member = &memberList[0]
+					return nil
+				}
+				return resource.RetryableError(err)
+			}
 			return checkForRetryableError(err)
 		}
 		return nil
