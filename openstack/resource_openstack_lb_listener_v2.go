@@ -2,9 +2,12 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/gophercloud/gophercloud"
 	"log"
+	"strings"
 	"time"
 
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
@@ -155,6 +158,24 @@ func resourceListenerV2Create(d *schema.ResourceData, meta interface{}) error {
 	err = resource.Retry(timeout, func() *resource.RetryError {
 		listener, err = neutronlisteners.Create(lbClient, createOpts).Extract()
 		if err != nil {
+			err409, ok := err.(gophercloud.ErrDefault409)
+			if ok && strings.Contains(string(err409.Body), "LoadBalancerListenerProtocolPortExists") {
+				pages, err := neutronlisteners.List(lbClient, listeners.ListOpts{
+					LoadbalancerID: d.Get("loadbalancer_id").(string),
+					ProtocolPort:   d.Get("protocol_port").(int),
+				}).AllPages()
+				if err != nil {
+					return resource.RetryableError(err)
+				}
+				listenersList, err := listeners.ExtractListeners(pages)
+				if err != nil {
+					return resource.RetryableError(err)
+				}
+				if len(listenersList) == 1 {
+					return nil
+				}
+				return resource.RetryableError(err)
+			}
 			return checkForRetryableError(err)
 		}
 		return nil
